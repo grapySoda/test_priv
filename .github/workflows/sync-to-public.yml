@@ -1,0 +1,47 @@
+name: Sync Release to Public Repo
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Private Repo
+        uses: actions/checkout@v4
+
+      - name: Setup Git Configuration
+        run: |
+          # Configure git to use the official GitHub Actions bot identity
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+      - name: Clone Public Repo
+        env:
+          API_TOKEN_GITHUB: ${{ secrets.PUBLIC_REPO_TOKEN }}
+        run: |
+          # Clone the public repository using the provided Personal Access Token
+          git clone https://x-access-token:${API_TOKEN_GITHUB}@github.com/grapySoda/test_pub.git public-repo
+
+      - name: Sync Files and Push
+        run: |
+          # Ensure the release directory exists in the target repo
+          mkdir -p public-repo/release/
+
+          # Copy files from the private repo to the public repo
+          cp -r release/* public-repo/release/
+          cp README.md public-repo/
+
+          # Navigate to the public repo directory
+          cd public-repo
+          git add .
+          
+          # Check if there are any changes to commit
+          if git diff --quiet HEAD --; then
+            echo "No changes to sync."
+          else
+            # Commit and push the changes using the bot identity
+            git commit -m "chore: sync release files from private repo (${{ github.event.release.tag_name }})"
+            git push origin main
+          fi
